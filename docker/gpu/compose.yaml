@@ -1,0 +1,40 @@
+# MinerU GPU 版服务编排（NVIDIA RTX 3090，mineru-api 单服务）
+# 启动方式：
+#   docker compose -f compose.yaml up -d
+# 访问 API 文档：http://<host>:8000/docs
+#
+# 说明：
+# - mineru-api 单服务默认占用 1 张卡（VLM 模型仅 1.2B，单张 3090 足够）。
+# - 如需指定其它卡：修改下方 device_ids。
+# - 如需单实例跨多卡（对 1.2B 模型无必要）：device_ids 改为 ["0","1","2","3"]
+#   并在 command 中加 --tensor-parallel-size 4。
+# - 如需 4 卡并行提高吞吐，建议改用 mineru-router（--local-gpus auto，每卡一个 worker）。
+
+services:
+  mineru-api:
+    image: mineru:gpu
+    container_name: mineru-api
+    restart: always
+    ports:
+      - 8000:8000
+    environment:
+      MINERU_MODEL_SOURCE: local
+    entrypoint: mineru-api
+    command:
+      --host 0.0.0.0
+      --port 8000
+      # --gpu-memory-utilization 0.5   # 显存紧张时调低 KV cache
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    ipc: host
+    shm_size: 32g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]   # 单服务用 1 卡；可改为 ["0","1","2","3"]
+              capabilities: [gpu]

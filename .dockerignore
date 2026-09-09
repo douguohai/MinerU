@@ -1,0 +1,5 @@
+# Docker 构建上下文只保留 docker/ 目录。
+# Dockerfile 通过 pip 从 PyPI 安装 mineru（不依赖本地源码），
+# 因此无需把整个仓库（.git/docs/tests/demo 等）作为构建上下文上传。
+*
+!docker/

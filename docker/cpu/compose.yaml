@@ -1,0 +1,39 @@
+# MinerU CPU 版服务编排（纯 CPU，pipeline 后端）
+# 启动方式：
+#   docker compose -f compose.yaml --profile api up -d      # FastAPI 服务
+#   docker compose -f compose.yaml --profile gradio up -d   # Gradio WebUI
+#
+# 注意：CPU 版只支持 pipeline 后端，调用 API 时请求体需带 "backend": "pipeline"。
+
+services:
+  mineru-api:
+    image: mineru:cpu
+    container_name: mineru-api-cpu
+    restart: always
+    profiles: ["api"]
+    ports:
+      - 8000:8000
+    environment:
+      MINERU_MODEL_SOURCE: local
+      MINERU_DEVICE_MODE: cpu
+    entrypoint: mineru-api
+    command:
+      --host 0.0.0.0
+      --port 8000
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+
+  mineru-gradio:
+    image: mineru:cpu
+    container_name: mineru-gradio-cpu
+    restart: always
+    profiles: ["gradio"]
+    ports:
+      - 7860:7860
+    environment:
+      MINERU_MODEL_SOURCE: local
+      MINERU_DEVICE_MODE: cpu
+    entrypoint: mineru-gradio
+    command:
+      --server-name 0.0.0.0
+      --server-port 7860
