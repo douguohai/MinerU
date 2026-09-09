@@ -1,0 +1,96 @@
+# =============================================================================
+# 从 GHCR 拉取已构建的镜像做离线冒烟测试（不在本地拉镜像）
+#
+# 手动触发：Actions -> "test-docker-images" -> Run workflow
+# 前置：build-docker-images 已跑完，ghcr.io/<owner>/mineru:cpu / :gpu 已存在
+#
+# 验证点：
+#  1) CPU 镜像：--network none 断网解析中文 PDF（数字版 + 扫描 OCR 版）
+#     -> 成功即证明「模型已打包、运行时不联网下载」且中文解析正常。
+#  2) GPU 镜像：检查 GHCR 上镜像体积/层（模型层在构建时打进，无需拉取 17GB 镜像）。
+#     实际 GPU 推理需在 3090 机器上验证（GitHub 免费 runner 无 GPU）。
+# =============================================================================
+name: test-docker-images
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  packages: read
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: ${{ github.repository_owner }}/mineru
+
+jobs:
+  test-cpu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Pull CPU image
+        run: docker pull ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cpu
+
+      - name: Parse Chinese digital PDF (offline)
+        run: |
+          mkdir -p out_digital
+          docker run --rm --network none \
+            -v "$PWD:/data" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cpu \
+            mineru -p /data/docker/test/cn_digital.pdf -o /data/out_digital -b pipeline
+          echo "=== digital output files ==="
+          find out_digital -type f | head -30
+
+      - name: Parse Chinese OCR PDF (offline)
+        run: |
+          mkdir -p out_ocr
+          docker run --rm --network none \
+            -v "$PWD:/data" \
+            ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:cpu \
+            mineru -p /data/docker/test/cn_ocr.pdf -o /data/out_ocr -b pipeline
+          echo "=== ocr output files ==="
+          find out_ocr -type f | head -30
+
+      - name: Verify Chinese text in output
+        run: |
+          python3 - <<'PYEOF'
+          import pathlib, re
+          cjk = re.compile(r'[\u4e00-\u9fff]')
+          ok = True
+          for name, must_contain in [('out_digital', '人工智能'), ('out_ocr', None)]:
+              md_files = list(pathlib.Path(name).rglob('*.md'))
+              text = '\n'.join(f.read_text(encoding='utf-8', errors='ignore') for f in md_files)
+              has_cjk = bool(cjk.search(text))
+              print(f'{name}: {len(md_files)} md file(s), has_cjk={has_cjk}, has_expected={must_contain in text if must_contain else "n/a"}')
+              if not has_cjk:
+                  ok = False
+              if must_contain and must_contain not in text:
+                  ok = False
+          if not ok:
+              raise SystemExit('FAIL: Chinese text not found in parsed output')
+          print('PASS: 中文解析成功，且全程 --network none（无运行时下载）')
+          PYEOF
+
+  check-gpu:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Inspect GPU image (models baked at build)
+        run: |
+          docker buildx imagetools inspect ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:gpu
+          echo "--- (以上应显示明显大于 vllm 基础镜像的体积，说明 pipeline+VLM 模型层已打进) ---"
