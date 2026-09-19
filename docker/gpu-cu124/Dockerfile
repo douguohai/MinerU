@@ -21,7 +21,9 @@
 # 基础镜像自带 torch 2.6.0 + CUDA 12.4（cu124）+ cuDNN 9，驱动 >= 550.54 即可。
 # 注意：torch 2.6 是最后一个「PyPI 默认 = CUDA 12.4」的版本，2.7 起默认跳到
 # CUDA 12.8（驱动需 >= 570），因此必须锁定 torch==2.6.0。
-FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-devel
+# 用 runtime 版而非 devel：pipeline 依赖均为预编译 wheel、无需编译工具，
+# 体积从 ~9GB 降到 ~3.3GB，显著加快 docker pull。
+FROM pytorch/pytorch:2.6.0-cuda12.4-cudnn9-runtime
 
 # OpenCV 依赖 + 中文字体
 RUN apt-get update && \
