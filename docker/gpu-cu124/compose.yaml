@@ -1,0 +1,40 @@
+# MinerU GPU（pipeline-only，CUDA 12.4）版服务编排
+# 适用于 NVIDIA 驱动 550.x（CUDA 12.4）且无法升级驱动的宿主机。
+# 本镜像不含 VLM（vLLM 在 CUDA 12.4 上不可用），只跑 pipeline 后端，
+# 调用 API 时请求体需带 "backend": "pipeline"。
+#
+# 启动方式：
+#   docker compose -f docker/gpu-cu124/compose.yaml up -d
+# 访问 API 文档：http://<host>:8000/docs
+#
+# 说明：
+# - pipeline 后端模型较小，单张卡足够；如需指定其它卡：修改 device_ids。
+
+services:
+  mineru-api:
+    image: mineru:gpu-cu124
+    container_name: mineru-api-cu124
+    restart: always
+    ports:
+      - 8000:8000
+    environment:
+      MINERU_MODEL_SOURCE: local
+      MINERU_DEVICE_MODE: cuda
+    entrypoint: mineru-api
+    command:
+      --host 0.0.0.0
+      --port 8000
+    ulimits:
+      memlock: -1
+      stack: 67108864
+    ipc: host
+    shm_size: 32g
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/health || exit 1"]
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              device_ids: ["0"]
+              capabilities: [gpu]
