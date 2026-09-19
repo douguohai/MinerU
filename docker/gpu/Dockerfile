@@ -30,7 +30,7 @@ RUN apt-get update && \
     rm -rf /var/lib/apt/lists/*
 
 # 安装 mineru core（vllm 已在基础镜像中）
-RUN python3 -m pip install -U 'mineru[core]>=3.4.0' --break-system-packages && \
+RUN python3 -m pip install -U 'mineru[core]>=3.4.0,<4.0.0' --break-system-packages && \
     python3 -m pip cache purge
 
 # 构建时下载全部模型（pipeline + VLM），打包进镜像 → 运行时离线可用

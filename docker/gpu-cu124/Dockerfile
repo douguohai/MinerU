@@ -38,7 +38,7 @@ RUN apt-get update && \
 # 安装 mineru core（pipeline + gradio，不含 vllm），并锁定 torch 2.6.0，
 # 避免 pip 把 torch 升到 2.7+（默认 CUDA 12.8，本镜像会跑不起来）。
 RUN python -m pip install --no-cache-dir \
-        'mineru[core]>=3.4.0' \
+        'mineru[core]>=3.4.0,<4.0.0' \
         'torch==2.6.0' \
         'torchvision==0.21.0' \
         --break-system-packages

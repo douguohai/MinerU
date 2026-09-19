@@ -29,7 +29,7 @@ RUN python3 -m pip install --no-cache-dir \
         --index-url https://download.pytorch.org/whl/cpu
 
 # 安装 mineru core（含 pipeline 依赖 + gradio WebUI，不含 vllm）
-RUN python3 -m pip install --no-cache-dir -U 'mineru[core]>=3.4.0'
+RUN python3 -m pip install --no-cache-dir -U 'mineru[core]>=3.4.0,<4.0.0'
 
 # 构建时下载 pipeline 模型（布局/OCR/表格/公式），打包进镜像 → 运行时离线可用
 RUN /bin/bash -c "mineru-models-download -s huggingface -m pipeline"
